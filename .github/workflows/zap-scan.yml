@@ -1,0 +1,34 @@
+name: OWASP ZAP DAST Scan
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  zap-scan:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Pull ZAP Docker image
+        run: docker pull ghcr.io/zaproxy/zaproxy:stable
+
+      - name: Run ZAP Baseline Scan against Juice Shop
+        run: |
+          docker run --rm \
+            --network host \
+            -v $(pwd)/zap-reports:/zap/wrk:rw \
+            ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:3000 \
+            -J zap-report.json \
+            -I
+
+      - name: Upload ZAP Report as Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: zap-report
+          path: zap-reports/zap-report.json
