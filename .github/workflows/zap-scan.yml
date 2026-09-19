@@ -38,9 +38,6 @@ jobs:
           name: zap-report
           path: ${{ github.workspace }}/zap-reports/zap-report.json
 
-      - name: Install jq for JSON parsing
-        run: sudo apt-get install -y jq
-
       - name: Extract ZAP findings and POST to Shuffle SOAR
         run: |
           ZAP_ALERT=$(jq -r '.site[0].alerts[0].alert // "No High Risk Alerts"' ${{ github.workspace }}/zap-reports/zap-report.json)
