@@ -37,3 +37,32 @@ jobs:
         with:
           name: zap-report
           path: ${{ github.workspace }}/zap-reports/zap-report.json
+
+      - name: Install jq for JSON parsing
+        run: sudo apt-get install -y jq
+
+      - name: Extract ZAP findings and POST to Shuffle SOAR
+        run: |
+          ZAP_ALERT=$(jq -r '.site[0].alerts[0].alert // "No High Risk Alerts"' ${{ github.workspace }}/zap-reports/zap-report.json)
+          ZAP_RISK=$(jq -r '.site[0].alerts[0].riskdesc // "LOW"' ${{ github.workspace }}/zap-reports/zap-report.json)
+          ZAP_CWE=$(jq -r '.site[0].alerts[0].cweid // "0"' ${{ github.workspace }}/zap-reports/zap-report.json)
+
+          curl -X POST "https://shuffler.io/api/v1/hooks/webhook_ff77deff-a6f2-40e1-b4ee-addc3d0e440b" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"scanner\": \"OWASP_ZAP_DAST\",
+              \"repository\": \"OWASP-Juice-Shop\",
+              \"cve_id\": \"CWE-$ZAP_CWE\",
+              \"finding\": \"$ZAP_ALERT\",
+              \"severity\": \"$ZAP_RISK\",
+              \"target_url\": \"http://localhost:3000\"
+            }"
+
+      - name: Break gate - fail pipeline if medium or higher findings exist
+        run: |
+          MEDIUM=$(jq '[.site[0].alerts[] | select(.riskcode | tonumber >= 2)] | length' ${{ github.workspace }}/zap-reports/zap-report.json)
+          echo "Medium or higher findings: $MEDIUM"
+          if [ "$MEDIUM" -gt "0" ]; then
+            echo "CRITICAL: Pipeline blocked. $MEDIUM medium or higher severity findings detected."
+            exit 1
+          fi
